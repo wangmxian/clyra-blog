@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next.js + Spring Architecture Blog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    colors: {
+                        'soft-bg': '#FDFCF8',
+                        'accent': '#1A1A1A',
+                        'sub-text': '#6B7280',
+                        'card-bg': 'rgba(255, 255, 255, 0.6)',
+                    },
+                    backgroundImage: {
+                        'grid-pattern': "linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)",
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 基础样式微调 */
+        body {
+            background-color: #FDFCF8;
+            color: #1A1A1A;
+            /* 细微的网格背景 */
+            background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), 
+                              linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* 噪点纹理，增加纸质感 */
+        .noise {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.03;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* 玻璃拟态卡片 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.02);
+        }
+
+        /* 隐藏滚动条但保留功能 */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* 动画辅助类 */
+        .reveal-up {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        
+        /* 图片悬停放大 */
+        .img-zoom-container {
+            overflow: hidden;
+        }
+        .img-zoom-container img {
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .img-zoom-container:hover img {
+            transform: scale(1.05);
+        }
+
+        /* 链接下划线动画 */
+        .link-underline {
+            position: relative;
+            text-decoration: none;
+        }
+        .link-underline::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            transform: scaleX(0);
+            height: 1px;
+            bottom: -2px;
+            left: 0;
+            background-color: currentColor;
+            transform-origin: bottom right;
+            transition: transform 0.25s ease-out;
+        }
+        .link-underline:hover::after {
+            transform: scaleX(1);
+            transform-origin: bottom left;
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-black selection:text-white">
+
+    <div class="noise"></div>
+
+    <div id="search-modal" class="fixed inset-0 z-[100] bg-white/90 backdrop-blur-xl hidden flex items-center justify-center opacity-0 transition-opacity duration-300">
+        <div class="w-full max-w-2xl px-6">
+            <div class="relative border-b-2 border-black pb-2">
+                <i class="ph ph-magnifying-glass absolute left-0 top-1/2 -translate-y-1/2 text-2xl text-gray-400"></i>
+                <input type="text" placeholder="Search articles, tags..." class="w-full bg-transparent pl-10 text-3xl font-serif outline-none placeholder:text-gray-300">
+                <button onclick="toggleSearch()" class="absolute right-0 top-1/2 -translate-y-1/2 hover:rotate-90 transition-transform">
+                    <i class="ph ph-x text-2xl"></i>
+                </button>
+            </div>
+            <div class="mt-8">
+                <p class="text-xs font-bold tracking-widest text-gray-400 uppercase mb-4">Quick Links</p>
+                <div class="flex gap-3 flex-wrap">
+                    <span class="px-3 py-1 bg-gray-100 rounded-full text-sm hover:bg-black hover:text-white cursor-pointer transition-colors">#NextJS</span>
+                    <span class="px-3 py-1 bg-gray-100 rounded-full text-sm hover:bg-black hover:text-white cursor-pointer transition-colors">#SpringCloud</span>
+                    <span class="px-3 py-1 bg-gray-100 rounded-full text-sm hover:bg-black hover:text-white cursor-pointer transition-colors">#Architecture</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <nav class="fixed top-0 w-full z-50 transition-all duration-300 border-b border-transparent" id="navbar">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
+            <a href="#" class="text-2xl font-serif font-semibold tracking-tight z-50">
+                MuXian<span class="text-gray-400">.Blog</span>
+            </a>
+
+            <div class="hidden md:flex items-center space-x-8 bg-white/50 backdrop-blur-md px-6 py-2 rounded-full border border-white/40 shadow-sm">
+                <a href="#" class="text-sm font-medium hover:text-gray-500 transition-colors">Home</a>
+                <a href="#articles" class="text-sm font-medium hover:text-gray-500 transition-colors">Articles</a>
+                <a href="#" class="text-sm font-medium hover:text-gray-500 transition-colors">Snippets</a>
+                <a href="#" class="text-sm font-medium hover:text-gray-500 transition-colors">About</a>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <button onclick="toggleSearch()" class="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <i class="ph ph-magnifying-glass text-xl"></i>
+                </button>
+                <a href="#" class="hidden md:block px-4 py-2 bg-black text-white text-sm rounded-full hover:bg-gray-800 transition-colors shadow-lg shadow-black/20">
+                    Subscribe
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-32 pb-20 px-6 max-w-7xl mx-auto">
+        
+        <header class="mb-20">
+            <div class="flex flex-col md:flex-row justify-between items-end gap-6 mb-8">
+                <div>
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 bg-white mb-6 reveal-up">
+                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <span class="text-xs font-medium text-gray-500">Available for Freelance</span>
+                    </div>
+                    <h1 class="text-5xl md:text-7xl font-serif leading-[1.1] reveal-up" style="transition-delay: 0.1s;">
+                        Exploring <br> 
+                        <span class="italic text-gray-400">Software</span> Architecture.
+                    </h1>
+                </div>
+                <div class="md:max-w-xs text-gray-500 leading-relaxed text-sm md:text-base reveal-up" style="transition-delay: 0.2s;">
+                    专注后端架构 (Spring) 与现代前端 (Next.js) 的融合。记录代码，分享思考，构建数字花园。
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-4 h-auto md:h-[500px] reveal-up" style="transition-delay: 0.3s;">
+                
+                <div class="md:col-span-2 md:row-span-2 glass-card rounded-3xl p-6 relative overflow-hidden group cursor-pointer img-zoom-container">
+                    <div class="absolute inset-0 z-0">
+                        <img src="https://images.unsplash.com/photo-1481487484168-9b995ecc168d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80" class="w-full h-full object-cover" alt="Featured">
+                        <div class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+                    </div>
+                    <div class="relative z-10 h-full flex flex-col justify-end text-white p-2">
+                        <div class="flex gap-2 mb-3">
+                            <span class="px-2 py-1 bg-white/20 backdrop-blur-md rounded-md text-xs border border-white/20">System Design</span>
+                        </div>
+                        <h3 class="text-3xl font-serif mb-2">构建高性能的个人博客系统</h3>
+                        <p class="text-gray-200 text-sm line-clamp-2">深度解析基于 Next.js ISR 与 Spring Boot 的全栈架构设计决策。</p>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-3xl p-6 flex flex-col justify-between hover:shadow-lg transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <i class="ph ph-stack text-3xl"></i>
+                        <i class="ph ph-arrow-up-right text-xl text-gray-400"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase tracking-widest mb-2">Tech Stack</div>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="px-2 py-1 bg-gray-100 rounded text-xs">Next.js</span>
+                            <span class="px-2 py-1 bg-gray-100 rounded text-xs">Spring Boot</span>
+                            <span class="px-2 py-1 bg-gray-100 rounded text-xs">Docker</span>
+                            <span class="px-2 py-1 bg-gray-100 rounded text-xs">MySQL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-3xl p-6 bg-black text-white flex flex-col justify-center items-center text-center group cursor-pointer">
+                    <i class="ph ph-github-logo text-4xl mb-2 group-hover:scale-110 transition-transform"></i>
+                    <div class="text-3xl font-serif font-bold">342</div>
+                    <div class="text-xs text-gray-400 mt-1">Commits this year</div>
+                </div>
+
+                <div class="md:col-span-2 glass-card rounded-3xl p-6 flex items-center justify-between relative overflow-hidden">
+                    <div class="relative z-10 max-w-xs">
+                        <h4 class="text-xl font-serif mb-1">Weekly Newsletter</h4>
+                        <p class="text-sm text-gray-500">Get the latest posts directly to your inbox.</p>
+                    </div>
+                    <form class="relative z-10 flex gap-2">
+                        <input type="email" placeholder="Email address" class="px-4 py-2 rounded-full bg-white border border-gray-200 text-sm outline-none focus:border-black transition-colors w-48">
+                        <button type="button" class="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center hover:bg-gray-800 transition-colors">
+                            <i class="ph ph-paper-plane-right"></i>
+                        </button>
+                    </form>
+                    <div class="absolute -right-10 -bottom-20 w-40 h-40 bg-gray-100 rounded-full blur-3xl"></div>
+                </div>
+
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12" id="articles">
+            
+            <div class="lg:col-span-8 space-y-12">
+                
+                <div class="sticky top-20 z-30 bg-[#FDFCF8]/95 backdrop-blur-sm py-4 border-b border-gray-100 mb-8 flex gap-4 overflow-x-auto hide-scrollbar">
+                    <button class="px-4 py-1.5 bg-black text-white rounded-full text-sm font-medium whitespace-nowrap">All Posts</button>
+                    <button class="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-sm hover:bg-gray-200 transition-colors whitespace-nowrap">Backend</button>
+                    <button class="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-sm hover:bg-gray-200 transition-colors whitespace-nowrap">Frontend</button>
+                    <button class="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-sm hover:bg-gray-200 transition-colors whitespace-nowrap">DevOps</button>
+                    <button class="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-sm hover:bg-gray-200 transition-colors whitespace-nowrap">Life</button>
+                </div>
+
+                <article class="group grid grid-cols-1 md:grid-cols-12 gap-6 items-start reveal-up">
+                    <div class="md:col-span-5 aspect-[4/3] rounded-2xl overflow-hidden img-zoom-container bg-gray-100">
+                        <img src="https://images.unsplash.com/photo-1555099962-4199c345e5dd?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" class="w-full h-full object-cover" alt="Article 1">
+                    </div>
+                    <div class="md:col-span-7 flex flex-col h-full justify-center">
+                        <div class="flex items-center gap-3 text-xs text-gray-500 mb-3 font-medium tracking-wide">
+                            <span class="text-black">BACKEND</span>
+                            <span class="w-1 h-1 rounded-full bg-gray-300"></span>
+                            <span>DEC 22, 2025</span>
+                            <span class="w-1 h-1 rounded-full bg-gray-300"></span>
+                            <span>5 MIN READ</span>
+                        </div>
+                        <h2 class="text-2xl font-serif font-semibold mb-3 leading-snug">
+                            <a href="#" class="link-underline">Spring Boot 3.0 迁移指南与踩坑实录</a>
+                        </h2>
+                        <p class="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-2">
+                            记录从 Spring Boot 2.7 升级到 3.0 过程中遇到的 Jakarta EE 命名空间变更、GraalVM 原生镜像配置等问题。
+                        </p>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-1 bg-gray-50 text-gray-500 text-xs rounded border border-gray-100">Java</span>
+                            <span class="px-2 py-1 bg-gray-50 text-gray-500 text-xs rounded border border-gray-100">Migration</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="group grid grid-cols-1 md:grid-cols-12 gap-6 items-start reveal-up">
+                    <div class="md:col-span-5 aspect-[4/3] rounded-2xl overflow-hidden img-zoom-container bg-gray-100">
+                        <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" class="w-full h-full object-cover" alt="Article 2">
+                    </div>
+                    <div class="md:col-span-7 flex flex-col h-full justify-center">
+                        <div class="flex items-center gap-3 text-xs text-gray-500 mb-3 font-medium tracking-wide">
+                            <span class="text-black">FRONTEND</span>
+                            <span class="w-1 h-1 rounded-full bg-gray-300"></span>
+                            <span>NOV 10, 2025</span>
+                            <span class="w-1 h-1 rounded-full bg-gray-300"></span>
+                            <span>8 MIN READ</span>
+                        </div>
+                        <h2 class="text-2xl font-serif font-semibold mb-3 leading-snug">
+                            <a href="#" class="link-underline">React Server Components 在博客中的应用</a>
+                        </h2>
+                        <p class="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-2">
+                            探讨 RSC 如何改变数据获取模式，以及在 Next.js 14+ 中如何混合使用 Server 和 Client Components。
+                        </p>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-1 bg-gray-50 text-gray-500 text-xs rounded border border-gray-100">React</span>
+                            <span class="px-2 py-1 bg-gray-50 text-gray-500 text-xs rounded border border-gray-100">Next.js</span>
+                        </div>
+                    </div>
+                </article>
+
+                 <article class="group grid grid-cols-1 md:grid-cols-12 gap-6 items-start reveal-up">
+                    <div class="md:col-span-5 aspect-[4/3] rounded-2xl overflow-hidden img-zoom-container bg-gray-100">
+                        <img src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" class="w-full h-full object-cover" alt="Article 3">
+                    </div>
+                    <div class="md:col-span-7 flex flex-col h-full justify-center">
+                        <div class="flex items-center gap-3 text-xs text-gray-500 mb-3 font-medium tracking-wide">
+                            <span class="text-black">SECURITY</span>
+                            <span class="w-1 h-1 rounded-full bg-gray-300"></span>
+                            <span>OCT 05, 2025</span>
+                            <span class="w-1 h-1 rounded-full bg-gray-300"></span>
+                            <span>6 MIN READ</span>
+                        </div>
+                        <h2 class="text-2xl font-serif font-semibold mb-3 leading-snug">
+                            <a href="#" class="link-underline">OAuth2 与 JWT：前后端分离认证方案</a>
+                        </h2>
+                        <p class="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-2">
+                            在若依后端体系下，如何安全地实现无状态认证，处理 Token 刷新与黑名单机制。
+                        </p>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-1 bg-gray-50 text-gray-500 text-xs rounded border border-gray-100">Security</span>
+                            <span class="px-2 py-1 bg-gray-50 text-gray-500 text-xs rounded border border-gray-100">JWT</span>
+                        </div>
+                    </div>
+                </article>
+
+                <div class="pt-8 flex justify-center reveal-up">
+                    <button class="px-8 py-3 border border-gray-200 rounded-full text-sm font-medium hover:border-black hover:bg-black hover:text-white transition-all">
+                        Load More Articles
+                    </button>
+                </div>
+            </div>
+
+            <aside class="lg:col-span-4 space-y-8">
+                
+                <div class="glass-card rounded-2xl p-6 reveal-up">
+                    <div class="flex items-center gap-4 mb-4">
+                        <img src="https://ui-avatars.com/api/?name=MuXian&background=000&color=fff" class="w-14 h-14 rounded-full border-2 border-white shadow-sm" alt="Avatar">
+                        <div>
+                            <h3 class="font-serif font-bold text-lg">MuXian</h3>
+                            <p class="text-xs text-gray-500">Full Stack Developer</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600 leading-relaxed mb-4">
+                        Building meaningful digital products. Lover of clean code, architecture, and photography.
+                    </p>
+                    <div class="flex gap-4 text-gray-400">
+                        <a href="#" class="hover:text-black transition-colors"><i class="ph ph-twitter-logo text-xl"></i></a>
+                        <a href="#" class="hover:text-black transition-colors"><i class="ph ph-github-logo text-xl"></i></a>
+                        <a href="#" class="hover:text-black transition-colors"><i class="ph ph-linkedin-logo text-xl"></i></a>
+                    </div>
+                </div>
+
+                <div class="reveal-up" style="transition-delay: 0.1s;">
+                    <h4 class="font-serif font-bold text-lg mb-4 flex items-center gap-2">
+                        <i class="ph ph-hash text-gray-400"></i> Trending Tags
+                    </h4>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="#" class="px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-xs hover:border-black transition-colors">Spring Boot (12)</a>
+                        <a href="#" class="px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-xs hover:border-black transition-colors">Next.js (8)</a>
+                        <a href="#" class="px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-xs hover:border-black transition-colors">Docker (5)</a>
+                        <a href="#" class="px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-xs hover:border-black transition-colors">System Design (4)</a>
+                        <a href="#" class="px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-xs hover:border-black transition-colors">Life (3)</a>
+                    </div>
+                </div>
+
+                <div class="reveal-up" style="transition-delay: 0.2s;">
+                    <h4 class="font-serif font-bold text-lg mb-4 flex items-center gap-2">
+                        <i class="ph ph-star text-gray-400"></i> Popular
+                    </h4>
+                    <div class="space-y-4">
+                        <a href="#" class="group block">
+                            <span class="text-xs text-gray-400 mb-1 block">DEC 12 · 2.5K VIEWS</span>
+                            <h5 class="font-medium group-hover:underline decoration-1 underline-offset-4">Why I chose Next.js over Vue for this blog</h5>
+                        </a>
+                        <hr class="border-gray-100">
+                        <a href="#" class="group block">
+                            <span class="text-xs text-gray-400 mb-1 block">NOV 28 · 1.8K VIEWS</span>
+                            <h5 class="font-medium group-hover:underline decoration-1 underline-offset-4">Setting up Nginx with SSL on Linux</h5>
+                        </a>
+                        <hr class="border-gray-100">
+                        <a href="#" class="group block">
+                            <span class="text-xs text-gray-400 mb-1 block">OCT 15 · 3.2K VIEWS</span>
+                            <h5 class="font-medium group-hover:underline decoration-1 underline-offset-4">My VS Code configuration for 2025</h5>
+                        </a>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <footer class="bg-black text-white pt-16 pb-8">
+        <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+            <div class="col-span-1 md:col-span-2">
+                <a href="#" class="text-2xl font-serif font-semibold tracking-tight mb-4 block">
+                    MuXian<span class="text-gray-500">.Blog</span>
+                </a>
+                <p class="text-gray-400 text-sm max-w-sm leading-relaxed">
+                    A digital space exploring the intricacies of code, design, and system architecture. Built with Next.js and Spring Boot.
+                </p>
+            </div>
+            <div>
+                <h4 class="text-sm font-bold uppercase tracking-widest mb-4 text-gray-500">Sitemap</h4>
+                <ul class="space-y-2 text-sm text-gray-300">
+                    <li><a href="#" class="hover:text-white transition-colors">Home</a></li>
+                    <li><a href="#" class="hover:text-white transition-colors">Articles</a></li>
+                    <li><a href="#" class="hover:text-white transition-colors">About Me</a></li>
+                    <li><a href="#" class="hover:text-white transition-colors">RSS Feed</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-sm font-bold uppercase tracking-widest mb-4 text-gray-500">Connect</h4>
+                <ul class="space-y-2 text-sm text-gray-300">
+                    <li><a href="#" class="hover:text-white transition-colors">Twitter / X</a></li>
+                    <li><a href="#" class="hover:text-white transition-colors">GitHub</a></li>
+                    <li><a href="#" class="hover:text-white transition-colors">LinkedIn</a></li>
+                    <li><a href="#" class="hover:text-white transition-colors">Email</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="max-w-7xl mx-auto px-6 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p class="text-xs text-gray-500">© 2025 MuXian.Blog. All rights reserved.</p>
+            <p class="text-xs text-gray-600">Designed by Gemini AI</p>
+        </div>
+    </footer>
+
+    <script>
+        // 1. 搜索框开关
+        function toggleSearch() {
+            const modal = document.getElementById('search-modal');
+            const isHidden = modal.classList.contains('hidden');
+            
+            if (isHidden) {
+                modal.classList.remove('hidden');
+                // 强制重绘以触发 transition
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modal.querySelector('input').focus();
+                }, 10);
+                document.body.style.overflow = 'hidden';
+            } else {
+                modal.classList.add('opacity-0');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+                document.body.style.overflow = '';
+            }
+        }
+
+        // 2. 导航栏滚动效果
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                navbar.classList.add('bg-white/80', 'backdrop-blur-md', 'border-gray-100');
+                navbar.classList.remove('border-transparent');
+            } else {
+                navbar.classList.remove('bg-white/80', 'backdrop-blur-md', 'border-gray-100');
+                navbar.classList.add('border-transparent');
+            }
+        });
+
+        // 3. 简单的滚动显现动画 (Intersection Observer)
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                    entry.target.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.reveal-up').forEach((el) => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

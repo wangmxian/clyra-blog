@@ -1,0 +1,32 @@
+# 依赖
+node_modules
+npm-debug.log*
+
+# 构建产物
+.next
+out
+
+# 测试
+coverage
+__tests__
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# 开发文件
+.git
+.gitignore
+.env.local
+.env.development
+.env.test
+README.md
+DEPLOY.md
+
+# IDE
+.vscode
+.idea
+
+# 其他
+*.md
+!README.md
